@@ -7,9 +7,16 @@
 </head>
 
 <body>
-    <canvas id="board_layer" style="border: 3px solid #333; margin:20px"></canvas>
-    <canvas id="piece_layer" style="border: 3px dotted red; margin:20px"></canvas>
-    <canvas id="overlay_layer" style="border: 3px dashed blue; margin:20px"></canvas>
+
+    <div>It's <span id="player_display"></span>'s turn.</div>
+    <div>Selected Piece: <span id="selected_display"></span></div>
+    <div>Allowed Movements: <span id="allowed_display"></span></div>
+    
+    <div class="canvas_wrapper">
+        <canvas id="board_layer" style="border: 3px solid #333; margin:20px"></canvas>
+        <canvas id="piece_layer" style="border: 3px dotted red; margin:20px"></canvas>
+        <canvas id="overlay_layer" style="border: 3px dashed blue; margin:20px"></canvas>
+    </div>
 </body>
 
 <script type="module" src="script.js"></script>

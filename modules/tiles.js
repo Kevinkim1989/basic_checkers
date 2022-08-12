@@ -9,60 +9,51 @@ export class Tile {
         this.column = tile.column;
         // this.is_path = false; // that a piece can be placed on.
         this.has_piece = false;
+        this.piece_key = NaN;
 
-        this.is_path = this.checkIsPath(this.row_key, this.column_key);
+        // this.is_path = this.checkIsPath(this.row_key, this.column_key);
+        this.is_path = this.checkIfPath(tile);
         this.color = (this.is_path) ? 'black' : 'red';
         
         this.x = this.row_key * 60;
         this.y = this.column_key * 60;
     }
 
-    // drawTile(canvas_id, tile){
-    //     const canvas = document.getElementById(canvas_id);
-    //     const ctx = canvas.getContext("2d");
-    //     ctx.fillStyle = tile.is_path ? "black" : "white";
-    //     ctx.fillRect(tile.x, tile.y, this.board.tile_size, this.board.tile_size);
-    //   }
+    checkIfPath(tile){
+        let tile_key = tile.key;
+        let row_key = tile.row_key;
+        let column_key = tile.column_key;
+        
+        let row_is_even = true;
+        let column_is_even = true;
+        let tile_is_path = false;
+        
+        if (row_key % 2){
+            row_is_even = false;
+        } else {
+            row_is_even = true;
+        }
+        
+        if (column_key % 2){
+            column_is_even = false;
+        } else {
+            column_is_even = true;
+        }
 
-    checkIsPath(row_key, column_key){
-        if (row_key % 2) {
-            if (column_key % 2) {
-                return false;
+        if (row_is_even){
+            if (column_is_even) {
+                tile_is_path = false;
             } else {
-                return true
+                tile_is_path = true;
             }
         } else {
-            if (column_key % 2){
-                return true;
+            if (column_is_even) {
+                tile_is_path = true;
             } else {
-                return false;
+                tile_is_path = false;
             }
         }
-    };
-    // initTiles(){
-    //     let tile_key = 0;
-    //     for (let i = 0; i < this.board.rows.length; i++) {
 
-    //         for (let k = 0; k < this.board.columns.length; k++) {
-    //             let tile = new Tile(this.board);
-    //             tile.key = tile_key;
-    //             tile.x = i * this.board.tile_size;
-    //             tile.row_name = this.board.rows[i];
-    //             tile.column_name = this.board.columns[k]; 
-    //             tile.row_key = this.board.rows.indexOf(this.board.rows[i]);
-    //             tile.column_key = this.board.columns.indexOf(this.board.columns[k]); 
-    //             tile.y = k * this.board.tile_size;
-
-    //         if (i % 2) { // odd row
-    //             tile.is_path = ((k % 2) == 0) // odd columns are playable tiles
-    //         } else { // even row
-    //             tile.is_path = ((k % 2) !== 0 ) // even columns 
-    //         }
-
-    //         this.board.tiles.push(tile);
-    //         tile_key++;
-    //     }
-    // }
-    // };
-
+        return tile_is_path;
+    }
 }
