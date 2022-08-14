@@ -11,9 +11,6 @@ drawGame();
 
 startGame();
 
-// updatePlayerTurn();
-
-
 // Functions
 
 function initGame(){
@@ -25,12 +22,11 @@ function initGame(){
     game.step = "Initializing";
     game.selected_piece_key = NaN;
     game.allowed_movements = [];
+    game.layers = ["board_layer", "piece_layer", "overlay_layer"];
 
     game.players[0].pieces = initPieces(game.tiles, game.players[0].key);
     game.players[1].pieces = initPieces(game.tiles, game.players[1].key);
-
 }
-
 
 function drawGame(){
     drawTiles("board_layer", game.tiles);
@@ -38,8 +34,8 @@ function drawGame(){
     drawPieces("piece_layer", game.tiles, game.players[1]);
 }
 
-
 function updateBoard(){
+    clearLayer("piece_layer");
     drawPieces("piece_layer", game.tiles, game.players[0]);
     drawPieces("piece_layer", game.tiles, game.players[1]);
 
@@ -52,7 +48,7 @@ function updateDisplay(){
 
     selected_display.innerHTML = "";
     movement_display.innerHTML = "";
-    clearMovementLayer("overlay_layer");
+    clearLayer("overlay_layer");
 
     // check if we have a selected piece
     if (!isNaN(game.selected_piece_key)){
@@ -72,7 +68,6 @@ function updateDisplay(){
     } else {
         selected_display.innerHTML = "";
         movement_display.innterHTML = "";
-    
     }
 }
 
@@ -83,16 +78,14 @@ function startGame(){
 }
 
 function drawMovementLayer(canvas_id){
-    // clearMovementLayer(canvas_id);
     if (isNaN(game.selected_piece_key)) return;
     for (let i = 0; i < game.allowed_movements.length; i++) {
         const path_tile_key = game.allowed_movements[i];
         drawPath(canvas_id, path_tile_key);
     }
-
 }
 
-function clearMovementLayer(canvas_id){
+function clearLayer(canvas_id){
     const canvas = document.getElementById(canvas_id);
     const ctx = canvas.getContext("2d");
     ctx.beginPath();
@@ -100,33 +93,18 @@ function clearMovementLayer(canvas_id){
 }
 
 function drawPath(canvas_id, path_tile_key){
-    const tiles = game.tiles;
-    const canvas = document.getElementById(canvas_id);
-    const ctx = canvas.getContext("2d");
-    const piece_tile = tiles[path_tile_key];
-    const column_key = piece_tile.column_key;
-    const row_key = piece_tile.row_key;
-    const arc_x = 60 * (row_key + 1) - 60 / 2;
-    const arc_y = (60 * (column_key + 1)) - 60 / 2;
-    const radius = 30 / 3;
-    const startAngle = 0;
-    const endAngle = Math.PI * 2;
+    const ctx = document.getElementById(canvas_id).getContext("2d");
+    const piece_tile = game.tiles[path_tile_key];
+    const arc_x = 60 * (piece_tile.row_key + 1) - 60 / 2;
+    const arc_y = (60 * (piece_tile.column_key + 1)) - 60 / 2;
     const player = game.players[game.player_turn];
 
-
     ctx.beginPath();
-    ctx.arc(arc_x, arc_y, radius, startAngle, endAngle);
+    ctx.arc(arc_x, arc_y, (30 / 3), 0, (Math.PI * 2));
     ctx.fillStyle = player.color;
     ctx.strokeStyle = player.color;
     ctx.fill();
     ctx.stroke();
-
-    // if ((player.key == game.player_turn) && 
-    //     (piece.key == game.selected_piece_key)) {
-    //         ctx.lineWidth = 2;
-    //         ctx.strokeStyle = "white";
-    //         ctx.stroke();            
-    // }
 }
 
 function initPlayerTurn(){
@@ -143,54 +121,68 @@ function updatePlayerTurn(){
     initPlayerTurn();
 }
 
-
-
-// Functions
-
 function setupCanvases(){
-    initCanvas("board_layer");
-    initCanvas("piece_layer");
-    initCanvas("overlay_layer");
+    for (let i = 0; i < game.layers.length; i++) {
+        const layer = game.layers[i];
+        const canvas = document.getElementById(layer);
+        canvas.height = canvas.width = (60 * 8);
+        canvas.addEventListener('mousedown', function(){
+            catchClick(event, canvas);
+        }, false);
+    }
 };
 
-function initCanvas(canvas_DOM_id){
-    const canvas = document.getElementById(canvas_DOM_id);
-    canvas.height = canvas.width = (60 * 8);
-    canvas.addEventListener('mousedown', function(){
-        catchClick(event, canvas);
-    }, false);
-}
-
 function catchClick(e, c){
-    const tiles = game.tiles;
     let relativeX = e.clientX - c.offsetLeft;
     let relativeY = e.clientY - c.offsetTop;
+    let clickInsideCanvas = ((relativeX > 0 && relativeX < c.width) && (relativeY > 0 && relativeY < c.height));
 
-    if ((relativeX > 0 && relativeX < c.width) 
-    && (relativeY > 0 && relativeY < c.height)) {
+    if (!clickInsideCanvas) return;
+
+    let tile_key = findTile(relativeX, relativeY);
+    routeClickAction(tile_key);
+    updateBoard();
+}
+
+function routeClickAction(tile_key){
+    if (isNaN(game.selected_piece_key)) {
+        checkForPiece(tile_key);
+        return;
+    }
+
+    if (game.selected_piece_key == game.tiles[tile_key].piece_key) {
+        clearSelectedPiece();
+        return;
+    } 
     
-        let tile_key = findTile(tiles, relativeX, relativeY);
+    if (game.allowed_movements.length !== 0) {
+        updateMovements(tile_key, game.player_turn);
+    }
+}
 
-        if (!isNaN(game.selected_piece_key)) {
-            if (game.selected_piece_key == tiles[tile_key].piece_key) {
-                clearSelectedPiece();
-            }
-
-            if (game.allowed_movements.length !== 0) {
-                for (let i = 0; i < game.allowed_movements.length; i++) {
-                    const path = game.allowed_movements[i];
-                    if (tile_key == path){
-                        game.players[game.player_turn].pieces[game.selected_piece_key].tile_key = tile_key;
-                    }
-                }
-            }
-
-        } else {
-
-            selectPiece(tile_key)
+function updateMovements(tile_key, player_key){
+    for (let i = 0; i < game.allowed_movements.length; i++) {
+        const path = game.allowed_movements[i];
+        if (tile_key == path){
+            let the_piece = game.players[game.player_turn].pieces[game.selected_piece_key];
+            clearTile(the_piece.tile_key);
+            the_piece.tile_key = tile_key;
+            updateTile(the_piece.tile_key, true, game.selected_piece_key, player_key);
+            clearSelectedPiece();
+            updatePlayerTurn();
         }
-        updateBoard();
     }    
+}
+
+function clearTile(target_tile_key){
+    updateTile(target_tile_key, false, NaN, NaN);
+}
+
+function updateTile(target_tile_key, has_piece, piece_key, player_key){
+    let tiles = game.tiles;
+    tiles[target_tile_key].has_piece = has_piece;
+    tiles[target_tile_key].piece_key = piece_key;
+    tiles[target_tile_key].player_key = player_key;
 }
 
 function clearSelectedPiece(){
@@ -198,32 +190,25 @@ function clearSelectedPiece(){
     game.allowed_movements = [];
 }
 
-function selectPiece(tile_key){
-    const tiles = game.tiles;
+function checkForPiece(tile_key){
+    if (!game.tiles[tile_key].has_piece) return; 
+    if (!game.tiles[tile_key].player_key == game.player_turn) return;
 
-    game.step = "clicking tile";
-    game.selected_piece_key = NaN;
+    let clicked_piece = game.players[game.player_turn].pieces[game.tiles[tile_key].piece_key];
 
-    // Determine if Tile has a Piece, and update game object.
-    if (tiles[tile_key].has_piece){
-        game.status = "Piece Selected";
-        game.step = "Movement";
-        game.selected_piece_key = tiles[tile_key].piece_key;
+    game.status = "Piece Selected";
+    game.step = "Movement";
 
-        // show the movement overlay.
-        // initMovementCanvas(); // already done...
-        game.allowed_movements = initMovementPaths(game.selected_piece_key);
-        // drawMovementPaths();
-        if (game.allowed_movements.length == 0){
-            game.step = "Waiting player turn";
-            game.selected_piece_key = NaN;
-            game.status = "Waiting player turn";
-        } else {
-            // game.step = "Waiting player turn";
-            // game.selected_piece_key = NaN;
-            // game.status = "Waiting player turn";
-        }
-    };
+    game.selected_piece_key = clicked_piece.key;
+    game.allowed_movements = initMovementPaths(game.selected_piece_key);
+
+    if (game.allowed_movements.length > 0) return;
+
+    // if (game.allowed_movements == undefined || game.allowed_movements.length == 0){
+        // game.step = "Waiting player turn";
+        // game.selected_piece_key = NaN;
+        // game.status = "Waiting player turn";
+    // }
 }
 
 function initMovementPaths(piece_key){
@@ -232,42 +217,55 @@ function initMovementPaths(piece_key){
     let piece = current_player.pieces[piece_key];
     let possible_movements = [];
     let allowed_movements = [];
+    let possible_jumps = [];
 
     let this_row = game.tiles[piece.tile_key].column_key; // (dont ask...... i'll fix this another time)
-    let next_row = this_row + 1;
+    let next_row = this_row;
 
-    possible_movements.push(piece.tile_key + 7);
-    possible_movements.push(piece.tile_key + 9);
+    if (game.player_turn == 0){
+        next_row = this_row + 1;
+        possible_movements.push(piece.tile_key + 7);
+        possible_movements.push(piece.tile_key + 9);
+    } else {
+        next_row = this_row - 1;
+        possible_movements.push(piece.tile_key - 7);
+        possible_movements.push(piece.tile_key - 9);
+    }
 
     //check if possible movements' tiles are playable.
     for (let i = 0; i < possible_movements.length; i++) {
         const movement = possible_movements[i];
-        if (game.tiles[possible_movements[i]].has_piece) continue;
-        if (game.tiles[possible_movements[i]].column_key !== next_row) continue;
+        if (game.tiles[movement].has_piece && game.tiles[movement].player_key !== game.player_turn) {
+            possible_jumps.push(movement);
+            continue;
+        };
+        if (game.tiles[movement].column_key !== next_row) continue;
         allowed_movements.push(movement);
     }
 
-    // possible_movements = [7,9];
+    if (game.player_turn == 0){
+        next_row = this_row + 2;
+    } else {
+        next_row = this_row - 2;
+    };
 
-    // let piece =
-//   let team_key = game.pieces[piece_key].team_key;
-//   let tile_key = game.pieces[piece_key].tile_key;
-//   let movements = [];
-//   if (team_key == 0){
-//     let next_row = game.tiles[tile_key].tile_row + 1;
-//     movements = audit_row_for_movements(next_row, piece_key, movements);
+    if (possible_jumps.length == 0) return allowed_movements;
 
-//   } else {
-//     // moves up towards row 0
-//   }
+    console.log(possible_jumps);
+    
+    for (let i = 0; i < possible_jumps.length; i++) {
+        const jump = possible_jumps[i];
+        if (game.tiles[jump].has_piece) continue;
+        if (game.tiles[jump].column_key !== next_row) continue;
+        allowed_movements.push(jump);
+        
+    }
 
-//   return movements;
-    // console.log("initMovementPaths for: " + tile_key);
     return allowed_movements;
 }
 
-
-function findTile(tiles, x, y){
+function findTile(x, y){
+    const tiles = game.tiles;
     for (let i = 0; i < tiles.length; i++) {
         const tile = tiles[i];
         let tile_start_x = tile.x;
@@ -282,6 +280,7 @@ function findTile(tiles, x, y){
 
         if (!is_point_in_tile) continue;
 
+        console.log(tile.key);
         return tile.key;
     }
 }
@@ -345,6 +344,7 @@ function initPieces(tiles, player_key){
 
         tiles[piece.tile_key].has_piece = true;
         tiles[piece.tile_key].piece_key = i;
+        tiles[piece.tile_key].player_key = player_key;
         player_pieces.push(new Piece(piece));
     };
 
@@ -352,25 +352,25 @@ function initPieces(tiles, player_key){
 
 };
 
-function linkPieceToTile(tiles, player_key){
-    if (player_key == 0) {
-        for (let k = 0; k < tiles.length; k++) {
-            let tile = tiles[k];
-            if (!tile.is_path) continue;
-            if (tile.has_piece) continue;
-            tiles.has_piece = true;
-            return tile.key;
-        }
-    } else {
-        for (let k = (tiles.length - 1); k > 0; k--) {
-            let tile = tiles[k];
-            if (!tile.is_path) continue;
-            if (tile.has_piece) continue;
-            tiles.has_piece = true;
-            return tile.key;
-        }        
-    }
-}
+// function linkPieceToTile(tiles, player_key){
+//     if (player_key == 0) {
+//         for (let k = 0; k < tiles.length; k++) {
+//             let tile = tiles[k];
+//             if (!tile.is_path) continue;
+//             if (tile.has_piece) continue;
+//             tiles.has_piece = true;
+//             return tile.key;
+//         }
+//     } else {
+//         for (let k = (tiles.length - 1); k > 0; k--) {
+//             let tile = tiles[k];
+//             if (!tile.is_path) continue;
+//             if (tile.has_piece) continue;
+//             tiles.has_piece = true;
+//             return tile.key;
+//         }        
+//     }
+// }
 
 function drawTiles(board_canvas, tiles){
     for (let i = 0; i < tiles.length; i++) {
@@ -394,20 +394,13 @@ function drawPieces(canvas_id, tiles, player){
 }
 
 function drawPiece(canvas_id, tiles, player, piece){
-    const canvas = document.getElementById(canvas_id);
-    const ctx = canvas.getContext("2d");
+    const ctx = document.getElementById(canvas_id).getContext("2d");
     const piece_tile = tiles[piece.tile_key];
-    const column_key = piece_tile.column_key;
-    const row_key = piece_tile.row_key;
-    const arc_x = 60 * (row_key + 1) - 60 / 2;
-    const arc_y = (60 * (column_key + 1)) - 60 / 2;
-    const radius = 60 / 3;
-    const startAngle = 0;
-    const endAngle = Math.PI * 2;
-
+    const arc_x = 60 * (piece_tile.row_key + 1) - 60 / 2;
+    const arc_y = (60 * (piece_tile.column_key + 1)) - 60 / 2;
 
     ctx.beginPath();
-    ctx.arc(arc_x, arc_y, radius, startAngle, endAngle);
+    ctx.arc(arc_x, arc_y, (60 / 3), 0, (Math.PI * 2));
     ctx.fillStyle = player.color;
     ctx.strokeStyle = player.color;
     ctx.fill();
@@ -420,3 +413,4 @@ function drawPiece(canvas_id, tiles, player, piece){
             ctx.stroke();            
     }
 }
+

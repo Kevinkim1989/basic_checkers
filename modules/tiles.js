@@ -7,11 +7,10 @@ export class Tile {
         this.column_key = tile.column_key;
         this.row = tile.row;
         this.column = tile.column;
-        // this.is_path = false; // that a piece can be placed on.
         this.has_piece = false;
         this.piece_key = NaN;
+        this.player_key = NaN;
 
-        // this.is_path = this.checkIsPath(this.row_key, this.column_key);
         this.is_path = this.checkIfPath(tile);
         this.color = (this.is_path) ? 'black' : 'red';
         
@@ -20,7 +19,6 @@ export class Tile {
     }
 
     checkIfPath(tile){
-        let tile_key = tile.key;
         let row_key = tile.row_key;
         let column_key = tile.column_key;
         
