@@ -80,7 +80,7 @@ function startGame(){
 function drawMovementLayer(canvas_id){
     if (isNaN(game.selected_piece_key)) return;
     for (let i = 0; i < game.allowed_movements.length; i++) {
-        const path_tile_key = game.allowed_movements[i];
+        const path_tile_key = game.allowed_movements[i].tile_key;
         drawPath(canvas_id, path_tile_key);
     }
 }
@@ -93,6 +93,8 @@ function clearLayer(canvas_id){
 }
 
 function drawPath(canvas_id, path_tile_key){
+
+    console.log(path_tile_key);
     const ctx = document.getElementById(canvas_id).getContext("2d");
     const piece_tile = game.tiles[path_tile_key];
     const arc_x = 60 * (piece_tile.row_key + 1) - 60 / 2;
@@ -146,7 +148,9 @@ function catchClick(e, c){
 
 function routeClickAction(tile_key){
     if (isNaN(game.selected_piece_key)) {
-        checkForPiece(tile_key);
+        let piece_key = checkForPiece(tile_key);
+        if (isNaN(piece_key)) return;
+        selectPiece(piece_key);
         return;
     }
 
@@ -163,7 +167,22 @@ function routeClickAction(tile_key){
 function updateMovements(tile_key, player_key){
     for (let i = 0; i < game.allowed_movements.length; i++) {
         const path = game.allowed_movements[i];
-        if (tile_key == path){
+        if (tile_key == path.tile_key){
+            if (!isNaN(path.jumped_piece_key)) {
+                if (game.player_turn == 0){
+                    clearTile(game.players[1].pieces[path.jumped_piece_key].tile_key);
+                    console.log("Jumping: " + path.jumped_piece_key);
+                    console.log(game.players[1].pieces[path.jumped_piece_key]);
+                    game.players[1].pieces.splice(path.jumped_piece_key, 1);
+
+                } else {
+                    clearTile(game.players[0].pieces[path.jumped_piece_key].tile_key);
+                    console.log("Jumping: " + path.jumped_piece_key);
+                    console.log(game.players[1].pieces[path.jumped_piece_key]);
+                    game.players[0].pieces.splice(path.jumped_piece_key, 1);
+
+                }
+            };
             let the_piece = game.players[game.player_turn].pieces[game.selected_piece_key];
             clearTile(the_piece.tile_key);
             the_piece.tile_key = tile_key;
@@ -185,10 +204,7 @@ function updateTile(target_tile_key, has_piece, piece_key, player_key){
     tiles[target_tile_key].player_key = player_key;
 }
 
-function clearSelectedPiece(){
-    game.selected_piece_key = NaN; // then remove the selected piece.
-    game.allowed_movements = [];
-}
+
 
 function checkForPiece(tile_key){
     if (!game.tiles[tile_key].has_piece) return; 
@@ -196,25 +212,24 @@ function checkForPiece(tile_key){
 
     let clicked_piece = game.players[game.player_turn].pieces[game.tiles[tile_key].piece_key];
 
+    return clicked_piece.key;
+}
+
+function selectPiece(piece_key){
     game.status = "Piece Selected";
     game.step = "Movement";
 
-    game.selected_piece_key = clicked_piece.key;
-    game.allowed_movements = initMovementPaths(game.selected_piece_key);
+    game.selected_piece_key = piece_key;
+    game.allowed_movements = initMovementPaths(game.selected_piece_key);    
+}
 
-    if (game.allowed_movements.length > 0) return;
-
-    // if (game.allowed_movements == undefined || game.allowed_movements.length == 0){
-        // game.step = "Waiting player turn";
-        // game.selected_piece_key = NaN;
-        // game.status = "Waiting player turn";
-    // }
+function clearSelectedPiece(){
+    game.selected_piece_key = NaN; // then remove the selected piece.
+    game.allowed_movements = [];
 }
 
 function initMovementPaths(piece_key){
-    let current_player_key = game.player_turn;
-    let current_player = game.players[current_player_key];
-    let piece = current_player.pieces[piece_key];
+    let piece = game.players[game.player_turn].pieces[piece_key];
     let possible_movements = [];
     let allowed_movements = [];
     let possible_jumps = [];
@@ -224,40 +239,55 @@ function initMovementPaths(piece_key){
 
     if (game.player_turn == 0){
         next_row = this_row + 1;
-        possible_movements.push(piece.tile_key + 7);
-        possible_movements.push(piece.tile_key + 9);
+        possible_movements.push({tile_key:piece.tile_key + 7, direction: "left"});
+        possible_movements.push({tile_key:piece.tile_key + 9, direction: "right"});
     } else {
         next_row = this_row - 1;
-        possible_movements.push(piece.tile_key - 7);
-        possible_movements.push(piece.tile_key - 9);
+        possible_movements.push({tile_key:piece.tile_key - 7, direction: "right"});
+        possible_movements.push({tile_key:piece.tile_key - 9, direction: "left"});
     }
 
     //check if possible movements' tiles are playable.
     for (let i = 0; i < possible_movements.length; i++) {
         const movement = possible_movements[i];
-        if (game.tiles[movement].has_piece && game.tiles[movement].player_key !== game.player_turn) {
-            possible_jumps.push(movement);
+        const current_tile = game.tiles[movement.tile_key];
+        if (current_tile.has_piece && current_tile.player_key !== game.player_turn) {
+            if (game.player_turn == 0){
+                if (movement.direction == "right"){
+                    possible_jumps.push({tile_key: parseInt(movement.tile_key) + 9, jumped_tile_key: parseInt(movement.tile_key)});
+                } else {
+                    possible_jumps.push({tile_key: parseInt(movement.tile_key) + 7, jumped_tile_key: parseInt(movement.tile_key)});        
+                }
+            } else {
+                if (movement.direction == "right"){
+                    possible_jumps.push({tile_key: parseInt(movement.tile_key) - 7, jumped_tile_key: parseInt(movement.tile_key)});
+                } else {
+                    possible_jumps.push({tile_key: parseInt(movement.tile_key) - 9, jumped_tile_key: parseInt(movement.tile_key)});        
+                }
+            }
             continue;
         };
-        if (game.tiles[movement].column_key !== next_row) continue;
-        allowed_movements.push(movement);
+        if (current_tile.column_key !== next_row) continue;
+        allowed_movements.push({tile_key: movement.tile_key, jumped_piece_key: NaN});
     }
+
+    if (possible_jumps.length == 0) return allowed_movements;
 
     if (game.player_turn == 0){
         next_row = this_row + 2;
     } else {
         next_row = this_row - 2;
-    };
-
-    if (possible_jumps.length == 0) return allowed_movements;
-
-    console.log(possible_jumps);
+    };    
     
     for (let i = 0; i < possible_jumps.length; i++) {
-        const jump = possible_jumps[i];
-        if (game.tiles[jump].has_piece) continue;
-        if (game.tiles[jump].column_key !== next_row) continue;
-        allowed_movements.push(jump);
+        const movement = possible_jumps[i];
+        const current_tile = game.tiles[movement.tile_key];
+        const jumped_tile = game.tiles[movement.jumped_tile_key];
+        let jumped_piece_key = jumped_tile.piece_key;
+
+        if (current_tile.has_piece) continue;
+        if (current_tile.column_key !== next_row) continue;
+        allowed_movements.push({tile_key: movement.tile_key, jumped_piece_key: jumped_piece_key});
         
     }
 
